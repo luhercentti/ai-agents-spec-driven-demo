@@ -6,6 +6,7 @@ Output is written to output/answers.md.
 """
 
 import sys
+import os
 from pathlib import Path
 
 import numpy as np
@@ -14,6 +15,8 @@ from openai import OpenAI
 DOCS_DIR = Path(__file__).parent / "docs"
 OUTPUT_PATH = Path(__file__).parent / "output" / "answers.md"
 SIMILARITY_THRESHOLD = 0.3
+CHAT_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
+EMBED_MODEL = "text-embedding-3-small"
 
 QUESTIONS = [
     "How is cosine similarity calculated between two embeddings?",
@@ -39,7 +42,7 @@ def load_chunks() -> list[dict]:
 def embed_texts(client: OpenAI, texts: list[str]) -> np.ndarray:
     """Embed a list of strings using text-embedding-3-small."""
     response = client.embeddings.create(
-        model="text-embedding-3-small",
+        model=EMBED_MODEL,
         input=texts,
     )
     vectors = [item.embedding for item in response.data]
@@ -62,7 +65,7 @@ def answer_question(client: OpenAI, question: str, context: str, source: str) ->
     )
     user = f"Context:\n{context}\n\nQuestion: {question}"
     response = client.chat.completions.create(
-        model="gpt-4o-mini",
+        model=CHAT_MODEL,
         messages=[
             {"role": "system", "content": system},
             {"role": "user", "content": user},
@@ -77,7 +80,7 @@ def main() -> None:
     chunks = load_chunks()
     chunk_texts = [c["text"] for c in chunks]
 
-    print(f"Embedding {len(chunks)} chunks...")
+    print(f"Embedding {len(chunks)} chunks (embed model: {EMBED_MODEL}, chat model: {CHAT_MODEL})...")
     chunk_embeddings = embed_texts(client, chunk_texts)
 
     results = []

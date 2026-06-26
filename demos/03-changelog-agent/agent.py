@@ -5,6 +5,7 @@ Output is written to output/CHANGELOG.md.
 """
 
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -12,6 +13,8 @@ from openai import OpenAI
 
 LOG_PATH = Path(__file__).parent / "git_log.txt"
 OUTPUT_PATH = Path(__file__).parent / "output" / "CHANGELOG.md"
+MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
+SUPPORTS_JSON_MODE = not MODEL.startswith("claude")
 
 SYSTEM_PROMPT = """
 You are a technical writer converting raw git commit messages into a clean changelog.
@@ -52,14 +55,15 @@ def load_log() -> str:
 
 def generate_changelog(log: str) -> dict:
     client = OpenAI()
-    print("Calling OpenAI API...")
+    print(f"Calling API (model: {MODEL})...")
+    kwargs = {"response_format": {"type": "json_object"}} if SUPPORTS_JSON_MODE else {}
     response = client.chat.completions.create(
-        model="gpt-4o-mini",
-        response_format={"type": "json_object"},
+        model=MODEL,
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": log},
         ],
+        **kwargs,
     )
     return json.loads(response.choices[0].message.content)
 

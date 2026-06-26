@@ -14,6 +14,9 @@ from openai import OpenAI
 
 SPEC_PATH = Path(__file__).parent / "SPEC.md"
 OUTPUT_PATH = Path(__file__).parent / "output" / "main.py"
+MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o")
+# Claude models don't support response_format=json_object — the system prompt handles JSON output
+SUPPORTS_JSON_MODE = not MODEL.startswith("claude")
 
 SYSTEM_PROMPT = """
 You are an expert Python developer. Your task is to read an API specification written
@@ -45,14 +48,15 @@ def load_spec() -> str:
 
 def generate_api(spec: str) -> str:
     client = OpenAI()
-    print("Calling OpenAI API...")
+    print(f"Calling API (model: {MODEL})...")
+    kwargs = {"response_format": {"type": "json_object"}} if SUPPORTS_JSON_MODE else {}
     response = client.chat.completions.create(
-        model="gpt-4o",
-        response_format={"type": "json_object"},
+        model=MODEL,
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": spec},
         ],
+        **kwargs,
     )
     raw = response.choices[0].message.content
     parsed = json.loads(raw)

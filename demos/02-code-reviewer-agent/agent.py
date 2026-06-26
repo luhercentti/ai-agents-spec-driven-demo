@@ -5,6 +5,7 @@ Output is written to output/review.md.
 """
 
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -12,6 +13,8 @@ from openai import OpenAI
 
 DIFF_PATH = Path(__file__).parent / "sample_diff.txt"
 OUTPUT_PATH = Path(__file__).parent / "output" / "review.md"
+MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o")
+SUPPORTS_JSON_MODE = not MODEL.startswith("claude")
 
 SYSTEM_PROMPT = """
 You are a senior software engineer performing a code review.
@@ -61,14 +64,15 @@ def load_diff() -> str:
 
 def review_diff(diff: str) -> dict:
     client = OpenAI()
-    print("Calling OpenAI API...")
+    print(f"Calling API (model: {MODEL})...")
+    kwargs = {"response_format": {"type": "json_object"}} if SUPPORTS_JSON_MODE else {}
     response = client.chat.completions.create(
-        model="gpt-4o",
-        response_format={"type": "json_object"},
+        model=MODEL,
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": diff},
         ],
+        **kwargs,
     )
     return json.loads(response.choices[0].message.content)
 

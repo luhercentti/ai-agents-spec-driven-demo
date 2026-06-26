@@ -5,11 +5,14 @@ Output is written to output/result.md.
 """
 
 import json
+import os
 from pathlib import Path
 
 from openai import OpenAI
 
 OUTPUT_PATH = Path(__file__).parent / "output" / "result.md"
+MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o")
+SUPPORTS_JSON_MODE = not MODEL.startswith("claude")
 
 TASK = (
     "Write a technical explanation of how vector embeddings work "
@@ -19,10 +22,10 @@ TASK = (
 
 def chat(client: OpenAI, system: str, user: str, json_mode: bool = False) -> str:
     kwargs = {}
-    if json_mode:
+    if json_mode and SUPPORTS_JSON_MODE:
         kwargs["response_format"] = {"type": "json_object"}
     response = client.chat.completions.create(
-        model="gpt-4o",
+        model=MODEL,
         messages=[
             {"role": "system", "content": system},
             {"role": "user", "content": user},
@@ -87,6 +90,7 @@ def step4_refine(client: OpenAI, draft: str, critique: dict) -> str:
 
 def main() -> None:
     client = OpenAI()
+    print(f"Running prompt chain (model: {MODEL})...")
 
     outline = step1_plan(client)
     draft = step2_draft(client, outline)
