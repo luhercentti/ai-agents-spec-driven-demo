@@ -1,27 +1,15 @@
-"""
-Task Management API
-Generated from SPEC.md by demos/01-spec-to-api/generate.py
-"""
-
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel, Field
+from typing import List, Optional
 from datetime import datetime
 from enum import Enum
-from typing import Optional
 
-import uvicorn
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
-
-app = FastAPI(title="Task Management API")
-
-# ---------------------------------------------------------------------------
-# Models
-# ---------------------------------------------------------------------------
+app = FastAPI()
 
 class TaskStatus(str, Enum):
     todo = "todo"
     in_progress = "in_progress"
     done = "done"
-
 
 class Task(BaseModel):
     id: int
@@ -30,86 +18,65 @@ class Task(BaseModel):
     status: TaskStatus = TaskStatus.todo
     created_at: datetime
 
-
 class TaskCreate(BaseModel):
     title: str
     description: Optional[str] = None
-    status: TaskStatus = TaskStatus.todo
+    status: TaskStatus = Field(default=TaskStatus.todo)
 
+tasks: List[Task] = []
+next_task_id = 1
 
-class TaskUpdate(BaseModel):
-    title: Optional[str] = None
-    description: Optional[str] = None
-    status: Optional[TaskStatus] = None
-
-
-# ---------------------------------------------------------------------------
-# In-memory store
-# ---------------------------------------------------------------------------
-
-_tasks: list[Task] = []
-_next_id: int = 1
-
-
-# ---------------------------------------------------------------------------
-# Routes
-# ---------------------------------------------------------------------------
-
-@app.get("/tasks", response_model=list[Task])
+@app.get("/tasks", response_model=List[Task])
 def list_tasks():
     """Return a list of all tasks."""
-    return _tasks
-
+    return tasks
 
 @app.post("/tasks", response_model=Task, status_code=201)
-def create_task(payload: TaskCreate):
-    """Create a new task. Title is required. Status defaults to 'todo'."""
-    global _next_id
-    task = Task(
-        id=_next_id,
-        title=payload.title,
-        description=payload.description,
-        status=payload.status,
+def create_task(task_data: TaskCreate):
+    """Create a new task."""
+    global next_task_id
+    new_task = Task(
+        id=next_task_id,
+        title=task_data.title,
+        description=task_data.description,
+        status=task_data.status,
         created_at=datetime.utcnow(),
     )
-    _tasks.append(task)
-    _next_id += 1
-    return task
-
+    tasks.append(new_task)
+    next_task_id += 1
+    return new_task
 
 @app.get("/tasks/{task_id}", response_model=Task)
 def get_task(task_id: int):
-    """Return a single task by ID. Returns 404 if not found."""
-    for task in _tasks:
+    """Return a single task by ID."""
+    for task in tasks:
         if task.id == task_id:
             return task
-    raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
-
+    raise HTTPException(status_code=404, detail="Task not found")
 
 @app.patch("/tasks/{task_id}", response_model=Task)
-def update_task(task_id: int, payload: TaskUpdate):
-    """Update title, description, or status of a task. Returns 404 if not found."""
-    for i, task in enumerate(_tasks):
+def update_task(task_id: int, task_data: TaskCreate):
+    """Update a task by its ID."""
+    for task in tasks:
         if task.id == task_id:
-            updated = task.model_copy(update=payload.model_dump(exclude_none=True))
-            _tasks[i] = updated
-            return updated
-    raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
-
+            if task_data.title:
+                task.title = task_data.title
+            if task_data.description is not None:
+                task.description = task_data.description
+            if task_data.status:
+                task.status = task_data.status
+            return task
+    raise HTTPException(status_code=404, detail="Task not found")
 
 @app.delete("/tasks/{task_id}", status_code=204)
 def delete_task(task_id: int):
-    """Delete a task by ID. Returns 204 on success, 404 if not found."""
-    for i, task in enumerate(_tasks):
+    """Delete a task by ID."""
+    for i, task in enumerate(tasks):
         if task.id == task_id:
-            _tasks.pop(i)
+            tasks.pop(i)
             return
-    raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
-
-
-# ---------------------------------------------------------------------------
-# Entrypoint
-# ---------------------------------------------------------------------------
+    raise HTTPException(status_code=404, detail="Task not found")
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    import uvicorn
+    uvicorn.run(app, host="127.0.0.1", port=8000)
