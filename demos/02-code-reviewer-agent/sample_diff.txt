@@ -1,0 +1,51 @@
+diff --git a/server/auth.py b/server/auth.py
+index a1b2c3d..e4f5a6b 100644
+--- a/server/auth.py
++++ b/server/auth.py
+@@ -1,18 +1,42 @@
+ import os
++import hashlib
++import hmac
++import time
+ from typing import Optional
+-from fastapi import Header, HTTPException
++from fastapi import Header, HTTPException, Request
++from database import get_user_by_token
+
+-SECRET = "hardcoded-secret-key-do-not-use"
++SECRET = os.environ.get("APP_SECRET")
+
+-def verify_token(token: str) -> bool:
+-    return token == "admin123"
++def verify_token(authorization: Optional[str] = Header(None)) -> dict:
++    if authorization is None:
++        raise HTTPException(status_code=401, detail="Missing token")
++    token = authorization.replace("Bearer ", "")
++    user = get_user_by_token(token)
++    if not user:
++        raise HTTPException(status_code=401, detail="Invalid token")
++    return user
+
+-def get_current_user(authorization: Optional[str] = Header(None)):
+-    if not authorization or not verify_token(authorization):
+-        raise HTTPException(status_code=403, detail="Forbidden")
+-    return {"id": 1, "role": "admin"}
++def create_token(user_id: int) -> str:
++    timestamp = str(int(time.time()))
++    payload = f"{user_id}:{timestamp}"
++    signature = hmac.new(
++        SECRET.encode(),
++        payload.encode(),
++        hashlib.sha256
++    ).hexdigest()
++    return f"{payload}:{signature}"
++
++def check_admin(user: dict) -> None:
++    if user.get("role") != "admin":
++        raise HTTPException(status_code=403, detail="Admin required")
++
++def reset_password(user_id: int, new_password: str) -> bool:
++    hashed = hashlib.md5(new_password.encode()).hexdigest()
++    # TODO: save hashed to database
++    print(f"Password reset for user {user_id}: {hashed}")
++    return True

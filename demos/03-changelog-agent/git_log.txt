@@ -1,0 +1,20 @@
+a3f1c92 add rate limiting middleware to all API routes
+b7e2d14 fix null pointer in user session cleanup
+c1d4f88 add CSV export for analytics dashboard
+d9a3b21 wip
+e5c7f43 update README with new environment variables
+f2b8a19 remove deprecated /api/v1/legacy endpoints
+g4e9c37 fix incorrect status code on empty search results (was 500, now 204)
+h1d6b52 add dark mode support to settings page
+i8f3e74 fix typo in error message
+j2a5c89 upgrade fastapi from 0.95 to 0.111
+k7b1d63 add pagination to /users and /orders endpoints
+l3e8f21 add input validation for date range filters
+m9c4a76 remove user_legacy table migration script (already applied)
+n6d2b47 fix memory leak in background job processor
+o4a1f93 add prometheus metrics endpoint at /metrics
+p8c7e52 cleanup
+q1b4d86 add retry logic to outbound webhook delivery
+r5f9a23 fix duplicate email sending on password reset
+s2e6c71 add API key rotation endpoint
+t7d3b18 update dependencies
