@@ -88,7 +88,7 @@ Available models depend on your Copilot plan:
 | `claude-sonnet-4.6`, `claude-haiku-4.5`, `claude-opus-4.7` | No | Yes |
 | `gemini-3.5-flash`, `gemini-3.1-pro-preview` | No | Yes |
 
-> Claude and Gemini models are listed in the API but gated behind Copilot Enterprise.
+> Claude and Gemini models are listed in the API but can be gated behind Copilot Enterprise.
 > If you have Individual or Business, use `gpt-4o` — it works out of the box.
 
 Verify it works:
