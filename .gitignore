@@ -12,3 +12,6 @@ venv/
 env/
 .DS_Store
 *.log
+
+# Demo output artifacts — generated locally, not committed
+demos/*/output/
