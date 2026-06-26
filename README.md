@@ -152,11 +152,6 @@ What to expect:
 - A Python file with Pydantic models, 5 route handlers, and a `uvicorn.run` entrypoint
 - The script prints `Done. Written N lines to ...`
 
-Try with Claude:
-```sh
-OPENAI_MODEL=claude-sonnet-4.6 .venv/bin/python3 demos/01-spec-to-api/generate.py
-```
-
 ---
 
 **Demo 02 — Code Reviewer Agent**
@@ -170,11 +165,6 @@ What to expect:
 - A Markdown file with a summary, a severity-tagged findings table, and a verdict
 - The MD5 password hashing and unguarded `None` secret should both appear as `critical`
 - Verdict: `request-changes`
-
-Try with Claude:
-```sh
-OPENAI_MODEL=claude-sonnet-4.6 .venv/bin/python3 demos/02-code-reviewer-agent/agent.py
-```
 
 ---
 
@@ -190,11 +180,6 @@ What to expect:
 - No commit hashes in the output
 - Noise commits (`wip`, `cleanup`, `fix typo`) discarded
 
-Try with Gemini:
-```sh
-OPENAI_MODEL=gemini-3.5-flash .venv/bin/python3 demos/03-changelog-agent/agent.py
-```
-
 ---
 
 **Demo 04 — RAG Mini Pipeline**
@@ -208,11 +193,6 @@ What to expect:
 - Progress printed per question: `Processing: How is cosine similarity...`
 - Each answer cites the source document and similarity score
 - Embedding model is always `text-embedding-3-small` (via Copilot or OpenAI)
-
-Try with Claude for the Q&A step:
-```sh
-OPENAI_MODEL=claude-haiku-4.5 .venv/bin/python3 demos/04-rag-mini/pipeline.py
-```
 
 ---
 
@@ -228,11 +208,6 @@ What to expect:
 - Output file with all four steps as sections
 - Step 4 noticeably more complete than Step 2
 
-Try with Claude:
-```sh
-OPENAI_MODEL=claude-sonnet-4.6 .venv/bin/python3 demos/05-prompt-chain/chain.py
-```
-
 ---
 
 ### 5. Run all demos at once
@@ -240,7 +215,7 @@ OPENAI_MODEL=claude-sonnet-4.6 .venv/bin/python3 demos/05-prompt-chain/chain.py
 ```sh
 export OPENAI_API_KEY=$(gh auth token)
 export OPENAI_BASE_URL=https://api.githubcopilot.com
-export OPENAI_MODEL=claude-sonnet-4.6   # or gpt-4o, gemini-3.5-flash, etc.
+# OPENAI_MODEL defaults to gpt-4o — change if you have Copilot Enterprise
 
 for script in \
   demos/01-spec-to-api/generate.py \
@@ -256,30 +231,149 @@ done
 
 ---
 
-## Agent Infrastructure
+## Two-layer architecture
 
-### `.opencode/agents/`
+This repo has two distinct layers that serve different purposes. Understanding this
+distinction is the core idea the project demonstrates.
 
-Named agents used during development with [OpenCode](https://opencode.ai):
+```
+Layer 1 — Runtime demos        demos/*/
+Layer 2 — AI dev infrastructure  AGENTS.md, SPEC/, .opencode/, .agents/
+```
 
-- `spec-writer.md` — turns plain-English requirements into structured feature specs
-- `code-reviewer.md` — reviews diffs and produces structured, prioritized feedback
-- `changelog.md` — reads git history and produces clean, grouped changelogs
+They are completely independent. Layer 2 never gets called by Layer 1.
 
-### `.opencode/commands/`
+---
 
-Custom slash commands for use inside OpenCode:
+### Layer 1 — Runtime demos (`demos/`)
 
-- `/new-feature` — scaffolds a new feature spec from a prompt
-- `/review` — runs the code-reviewer agent on the current diff
-- `/spec-check` — validates that implementation matches its spec
+These are the Python scripts you run. They call the LLM API at runtime and produce
+output files. They have no dependency on anything in Layer 2.
 
-### `.agents/skills/`
+---
 
-Reusable skills loadable into any agent session:
+### Layer 2 — AI development infrastructure
 
-- `spec-writer` — structured spec writing from natural language input
-- `output-validator` — compares output artifacts against their source spec
+This layer is not code you execute. It is a set of structured documents that give
+AI coding assistants (like [OpenCode](https://opencode.ai), GitHub Copilot Chat, or
+Cursor) the context they need to work effectively inside this project. Think of it as
+documentation written for AI tools instead of humans.
+
+#### `AGENTS.md`
+
+Read by AI assistants automatically when they open this repo. It tells the assistant:
+
+- What this project is and how it is structured
+- What conventions to follow (spec-first rule, output artifact pattern)
+- What environment variables are needed and why
+- How to run the demos
+- What the coordinate system or domain-specific concepts are
+
+Without `AGENTS.md`, an AI assistant has to guess all of this from the code. With it,
+the assistant immediately has the full project context and gives better, more consistent
+answers from the first message.
+
+#### `SPEC/`
+
+The specification layer. Written **before** any code. Contains:
+
+| File | Purpose |
+|---|---|
+| `constitution.md` | The non-negotiable principles of this project — referenced when any decision is unclear |
+| `architecture.md` | How the system is structured and why — layers, data flow, constraints |
+| `roadmap.md` | What is done, in progress, and planned |
+| `tech-stack.md` | What tools are used, what is intentionally excluded, and why |
+| `features/_template.md` | The canonical template every feature spec must follow |
+| `features/*.md` | One spec per demo — written before the script was created |
+
+The `SPEC/` folder serves two audiences simultaneously:
+1. **Humans** — establishes shared understanding before implementation starts
+2. **AI assistants** — gives the assistant the intent and constraints behind the code,
+   so it can reason about correctness rather than just syntax
+
+When an AI assistant reads `SPEC/features/code-reviewer-agent.md` before editing
+`demos/02-code-reviewer-agent/agent.py`, it knows what the script is supposed to do,
+what it must not do, and what the acceptance criteria are. It cannot get that from the
+code alone.
+
+#### `.opencode/agents/`
+
+Named agent definitions read by [OpenCode](https://opencode.ai) during a development
+session. Each file defines a specific role the AI takes on when invoked:
+
+| File | What it defines |
+|---|---|
+| `spec-writer.md` | Role, rules, and output format for writing feature specs |
+| `code-reviewer.md` | Review rubric, severity levels, what NOT to comment on |
+| `changelog.md` | How to group commits, what to discard, output format |
+
+These are not called by the demo scripts. They are invoked when **you** ask the AI
+assistant to perform that role during development — for example, asking it to write a
+spec for a new feature, or review a diff before committing.
+
+#### `.opencode/commands/`
+
+Custom slash commands that extend the AI assistant's interface for this project.
+Defined in Markdown, registered with OpenCode, invoked by typing them in chat:
+
+| Command | What it does |
+|---|---|
+| `/new-feature <description>` | Activates `spec-writer` agent → scaffolds a new `SPEC/features/*.md` |
+| `/review [file]` | Activates `code-reviewer` agent → reviews current diff, returns structured report |
+| `/spec-check <demo>` | Activates `output-validator` skill → checks implementation against its spec |
+
+Again — these are development-time tools. They are not wired into the Python scripts.
+
+#### `.agents/skills/`
+
+Reusable capability definitions that can be loaded into any AI agent session,
+not just OpenCode. A skill is a portable description of *how to do something*:
+
+| Skill | What it teaches the agent |
+|---|---|
+| `spec-writer` | Step-by-step process for turning plain English into a structured spec |
+| `output-validator` | How to compare a committed artifact against its spec statically |
+
+The difference between a skill and an agent definition: an **agent** has a role and
+owns a task end-to-end. A **skill** is a reusable capability that any agent can load.
+`spec-writer` the agent uses `spec-writer` the skill, but the skill can also be loaded
+into a general-purpose assistant session without the full agent definition.
+
+---
+
+## How the two layers work together in practice
+
+Here is the actual development workflow this repo was built with:
+
+```
+1. Open repo in OpenCode
+   → AGENTS.md is read automatically → assistant has full project context
+
+2. Type: /new-feature "an agent that reads a CSV and detects anomalies"
+   → spec-writer agent activates
+   → reads _template.md
+   → produces SPEC/features/csv-anomaly-detector.md
+
+3. Review and approve the spec (human step)
+
+4. Ask: "implement this spec"
+   → assistant reads the spec + AGENTS.md + tech-stack.md
+   → writes demos/06-csv-anomaly-detector/agent.py
+
+5. Type: /spec-check demos/06-csv-anomaly-detector
+   → output-validator skill activates
+   → compares implementation against spec acceptance criteria
+   → returns a pass/fail checklist
+
+6. Type: /review
+   → code-reviewer agent activates
+   → reviews the diff
+   → returns structured findings before commit
+```
+
+The demo scripts in `demos/` are the **output** of this workflow — artifacts produced
+by running it. The infrastructure in Layer 2 is what made building them structured
+and repeatable.
 
 ---
 
